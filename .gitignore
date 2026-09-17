@@ -1,0 +1,15 @@
+.venv/
+__pycache__/
+*.pyc
+.gradle/
+**/build/
+/build/
+/dist/
+/release/
+local.properties
+*.log
+artifacts/
+/MyAudioApp.spec
+/hardware/
+/docs/
+/pc/test_*.py
