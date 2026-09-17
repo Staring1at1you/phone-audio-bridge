@@ -2,6 +2,59 @@
 
 [中文](#中文) | [English](#english)
 
+## 实现架构 / Architecture
+
+```mermaid
+flowchart LR
+    subgraph WIN[Windows PC]
+        APP[播放器 / 游戏 / 浏览器]
+        WASAPI[WASAPI Loopback]
+        BRIDGE[PhoneAudioBridge]
+        CABLE_IN[CABLE Input<br/>虚拟线播放端]
+        CABLE_OUT[CABLE Output<br/>虚拟麦克风]
+        VOICE[QQ / OBS / 会议软件]
+
+        APP -->|系统播放音频| WASAPI
+        WASAPI -->|PCM 2.0| BRIDGE
+        BRIDGE -->|手机麦克风 PCM| CABLE_IN
+        CABLE_IN --> CABLE_OUT
+        CABLE_OUT --> VOICE
+    end
+
+    subgraph LINK[Transport]
+        USB[USB ADB / TCP]
+        UDP[Wi-Fi Direct UDP<br/>令牌 + 序号 + 时间戳]
+        CTRL[ADB Control<br/>发现 / 模式 / 会话密钥]
+    end
+
+    subgraph PHONE[Android Phone]
+        SERVICE[AudioService]
+        TRACK[AudioTrack]
+        OUTPUT[手机扬声器 / 耳机]
+        MIC[手机麦克风]
+        RECORD[AudioRecord<br/>AEC + NS]
+
+        SERVICE --> TRACK
+        TRACK --> OUTPUT
+        MIC --> RECORD
+        RECORD --> SERVICE
+    end
+
+    BRIDGE -->|电脑音频下行| USB
+    BRIDGE -->|电脑音频下行| UDP
+    USB --> SERVICE
+    UDP --> SERVICE
+    SERVICE -->|麦克风上行| USB
+    SERVICE -->|麦克风上行| UDP
+    BRIDGE -.-> CTRL
+    CTRL -.-> SERVICE
+```
+
+```text
+下行：Windows 音频 -> WASAPI -> USB/Wi-Fi -> Android AudioTrack -> 手机扬声器
+上行：手机麦克风 -> AudioRecord/AEC -> USB/Wi-Fi -> VB-CABLE -> Windows 软件
+```
+
 ## 中文
 
 PhoneAudioBridge 是 Windows 电脑没有音响、耳机或可用外放设备时的应急音频方案。
