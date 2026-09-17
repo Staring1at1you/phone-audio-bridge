@@ -33,6 +33,24 @@ APK 路径为 `android/app/build/outputs/apk/debug/app-debug.apk`。
 构建需要 JDK 17、Gradle 8.9、Android SDK 35 和 Build Tools 34.0.0。
 SDK 默认路径为 `D:/Android/Sdk`，可通过 `-Sdk` 指定；Gradle 可通过 `-Gradle` 指定。
 
+### Windows ADB USB 驱动
+
+发布 ZIP 已包含 `adb.exe`，但 ADB 工具不能替代 Windows USB 驱动。首次通过 USB 连接时仍需安装：
+
+- 手机厂商提供的 Windows USB/ADB 驱动；或
+- [Google USB Driver](https://developer.android.com/studio/run/win-usb)。
+
+连接时使用支持数据传输的 USB 线，并将手机 USB 用途切换为“文件传输/MTP”。在 Windows
+设备管理器中，ADB 设备通常应显示为 `Android Composite ADB Interface`。
+
+```powershell
+adb devices -l
+```
+
+正常状态应为 `device`。`unauthorized` 表示需要解锁手机并确认 USB 调试授权；列表为空通常表示
+USB 驱动、数据线、USB 端口或手机 USB 模式有问题。部分品牌必须使用厂商驱动，Google 通用驱动
+未必能识别所有设备。
+
 ### 启动电脑端
 
 ```powershell
@@ -260,6 +278,23 @@ Open `Phone Audio Bridge` on the phone, grant microphone permission, and select 
 
 Building Android requires JDK 17, Gradle 8.9, Android SDK 35, and Build Tools 34.0.0. The default SDK
 path is `D:/Android/Sdk`; override it with `-Sdk`. Override Gradle with `-Gradle` when required.
+
+### Windows ADB USB Driver
+
+The release ZIP includes `adb.exe`, but ADB cannot replace the Windows USB device driver. For the first
+USB connection, install either the phone manufacturer's Windows USB/ADB driver or the official
+[Google USB Driver](https://developer.android.com/studio/run/win-usb).
+
+Use a data-capable USB cable and select **File Transfer / MTP** as the phone USB mode. Windows Device
+Manager should normally show `Android Composite ADB Interface`.
+
+```powershell
+adb devices -l
+```
+
+The expected state is `device`. `unauthorized` means the phone is waiting for USB-debugging approval.
+An empty list usually indicates a missing/wrong driver, charge-only cable, USB port issue, or incorrect
+phone USB mode. Some devices require the OEM driver and do not work with Google's generic driver.
 
 ### Windows
 

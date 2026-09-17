@@ -6,6 +6,9 @@ PhoneAudioBridge v0.7.1 - Quick Start / 快速开始
 1. 解压整个 ZIP，不要只单独运行 EXE。
 2. 在 Android 手机上安装 PhoneAudioBridge-Android.apk。
 3. 手机打开“开发者选项”和“USB 调试”，用数据线连接电脑并确认授权。
+   Windows 还需要手机厂商 USB 驱动或 Google USB Driver。
+   设备管理器应显示 Android Composite ADB Interface。
+   如果 adb devices 没有设备，请检查驱动、数据线和“文件传输”USB 模式。
 4. 手机打开 Phone Audio Bridge，允许麦克风权限，点击“启动音频”。
 5. 电脑运行 PhoneAudioBridge.exe。
 6. 选择手机设备和“电脑音频来源”，点击“连接”。
@@ -28,6 +31,9 @@ English
 1. Extract the entire ZIP. Do not run the EXE by itself outside the package.
 2. Install PhoneAudioBridge-Android.apk on the Android phone.
 3. Enable Developer options and USB debugging, connect USB, and approve the computer.
+   Windows also needs the phone OEM USB driver or Google USB Driver.
+   Device Manager should show Android Composite ADB Interface.
+   If adb devices is empty, check the driver, data cable, and File Transfer USB mode.
 4. Open Phone Audio Bridge on the phone, grant microphone permission, and tap Start Audio.
 5. Run PhoneAudioBridge.exe on Windows.
 6. Select the phone and PC audio source, then click Connect.
