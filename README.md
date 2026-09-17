@@ -1,5 +1,9 @@
 # PhoneAudioBridge
 
+[中文](#中文) | [English](#english)
+
+## 中文
+
 用 USB 数据线或局域网 Wi-Fi 把 Android 手机作为电脑的音频终端：
 
 - 电脑系统播放音频送到手机扬声器或手机连接的耳机。
@@ -198,7 +202,6 @@ Wi-Fi 的实际时延仍受路由器、信号强度和系统调度影响；有�
 声学环境和厂商算法会影响抑制效果，使用耳机可彻底切断扬声器到麦克风的声学路径。
 插拔耳机后建议停止并重新启动手机音频服务。还应确认 CABLE Output 的“侦听此设备”未启用，避免 Windows 内部形成数字回路。
 自动重连、EQ、抖动缓冲和 Opus 压缩为后续工作。
-详细大纲见 [实施计划](docs/implementation-plan.md)。
 
 ## GitHub 与 Windows 发布
 
@@ -216,3 +219,200 @@ Wi-Fi 的实际时延仍受路由器、信号强度和系统调度影响；有�
 
 推送 `v*` Git 标签时，[Windows Release workflow](.github/workflows/windows-release.yml) 会构建
 Android APK 和 Windows ZIP、上传 Actions artifact，并将 ZIP 附加到 GitHub Release。
+
+---
+
+## English
+
+PhoneAudioBridge turns an Android phone into a Windows audio endpoint:
+
+- Stream Windows playback to the phone speaker or a headset connected to the phone.
+- Return the phone microphone to Windows for calls, recording, conferencing, or streaming.
+- Use USB ADB for a stable wired connection or authenticated direct UDP for low-latency Wi-Fi audio.
+- Keep all PCM traffic local. No cloud relay is used.
+
+This is an application-level audio bridge. It does not register the phone as a native USB Audio Class
+device and does not install a Windows virtual microphone driver. Microphone return requires VB-CABLE or
+another virtual audio cable.
+
+## Quick Start
+
+### Android
+
+Enable Developer options and USB debugging, connect the phone, approve the computer, and run:
+
+```powershell
+.\build-android.ps1 -Install
+```
+
+Open `Phone Audio Bridge` on the phone, grant microphone permission, and select **Start Audio**.
+
+Building Android requires JDK 17, Gradle 8.9, Android SDK 35, and Build Tools 34.0.0. The default SDK
+path is `D:/Android/Sdk`; override it with `-Sdk`. Override Gradle with `-Gradle` when required.
+
+### Windows
+
+```powershell
+.\start-pc.ps1
+```
+
+The script creates or repairs `.venv`, validates dependencies, and starts the desktop UI. The project
+uses Python 3.11, SoundCard 0.4.5, and NumPy 1.26.x.
+
+Choose:
+
+- **Phone device**: the connected USB or Wi-Fi ADB phone.
+- **PC audio source**: the Windows speaker/headset endpoint that the target application uses.
+- **Phone microphone destination**: disable microphone return, or select a virtual cable playback endpoint such as `CABLE Input`.
+- **Audio quality**: Standard 48 kHz/16-bit, High 96 kHz/24-bit, or Lossless 192 kHz/24-bit PCM.
+- **Playback mode**: automatic, media-first, communication-first, or follow Windows microphone usage.
+- **Latency**: low latency or stable.
+
+Use **Detect Channels** to report the selected Windows WASAPI channel count, the current Android output
+device capability, their common channel capability, and the channel count actually carried by the protocol.
+
+## Convert USB ADB to Wireless
+
+Connect the phone and computer to the same LAN. First authorize USB debugging, then select
+**USB to Wireless** in the desktop application. PhoneAudioBridge automatically reads the phone WLAN IPv4,
+runs `adb tcpip 5555`, connects to `PHONE_IP:5555`, and refreshes the device list. No manual IP field is required.
+
+Equivalent commands:
+
+```powershell
+adb -s USB_SERIAL tcpip 5555
+adb connect PHONE_IP:5555
+```
+
+You can unplug USB after conversion. Reconnect through USB after a phone restart, network change, or
+debugging reset if the TCP ADB service is no longer available.
+
+## Phone Microphone on Windows
+
+Install [VB-CABLE](https://vb-audio.com/Cable/) or an equivalent virtual cable:
+
+```text
+Phone microphone -> PhoneAudioBridge -> CABLE Input (playback endpoint)
+                                             |
+                                             v
+                                   CABLE Output (recording endpoint)
+                                             |
+                                             v
+                                  QQ / OBS / conference software
+```
+
+Select `CABLE Input` as the microphone destination in PhoneAudioBridge. Select `CABLE Output` as the
+microphone in the destination application. If an application follows the Windows default communication
+device, set `CABLE Output` as both the default recording and default communication device in `mmsys.cpl`,
+then restart that application.
+
+Do not use the same endpoint for PC playback capture and microphone return. Disable **Listen to this
+device** on `CABLE Output` to avoid a Windows feedback loop. A headset connected to the phone provides
+the strongest acoustic separation; phone speaker mode uses Android AEC and noise suppression.
+
+## Playback Modes
+
+- **Automatic**: communication processing is requested whenever microphone return is enabled.
+- **Media first**: keeps microphone return active while preserving Android media playback processing.
+- **Communication first**: always requests communication mode and AEC.
+- **Follow Windows microphone**: combines `CABLE Output` WASAPI sessions with Windows microphone privacy
+  state. It enters communication mode after approximately 0.5 seconds of microphone activity and returns
+  to media mode after approximately 2 seconds of inactivity.
+
+Applications that keep a recording session open while internally muted are still considered active by Windows.
+
+## Transport and Audio Quality
+
+```text
+Windows playback -> WASAPI loopback -> PC bridge
+                                      |
+                         USB: ADB/TCP | Wi-Fi: authenticated UDP
+                                      |
+                                      v
+                              Android AudioTrack
+
+Android AudioRecord -> USB TCP / Wi-Fi UDP -> PC bridge -> virtual cable
+```
+
+USB uses phone-local TCP ports `27183/27184`. Wi-Fi playback uses UDP `27185`; ADB temporarily forwards
+control port `27187` only. UDP packets carry a random 64-bit session token, sequence number, monotonic
+timestamp, PCM format, and fragment metadata.
+
+Quality profiles:
+
+- **Standard**: 48 kHz / 16-bit PCM, approximately 1.536 Mbps stereo.
+- **High**: 96 kHz / packed 24-bit PCM, approximately 4.608 Mbps stereo.
+- **Lossless**: 192 kHz / packed 24-bit PCM, approximately 9.216 Mbps stereo.
+
+All profiles use uncompressed PCM. High-resolution UDP frames are split into MTU-safe application
+fragments and reassembled before jitter buffering. Android capability negotiation automatically falls
+back when the requested format is unsupported. Communication mode always uses 48 kHz / 16-bit PCM to
+preserve AEC and microphone stability.
+
+Higher sample rates preserve an existing high-resolution source; they do not recreate information that
+has already been mixed or decoded at 48 kHz.
+
+Latency profiles:
+
+- **Low latency**: two UDP packets (10 ms) of Wi-Fi jitter buffering and reduced Android buffering.
+- **Stable**: four UDP packets (20 ms) and more tolerance for wireless jitter.
+
+USB is usually more deterministic. Actual latency also includes the Windows capture period, Android
+AudioFlinger processing, AEC, and the phone output hardware period.
+
+## Troubleshooting
+
+- `Microphone output: disabled`: microphone return is turned off; this is not a hardware fault.
+- No microphone signal: stop streaming and run **Test Microphone**. Check Android permission, mute state,
+  and the system microphone privacy switch.
+- Signal reaches PhoneAudioBridge but not the destination application: verify `CABLE Input` in this app
+  and `CABLE Output` in the destination application.
+- `0x8889000a`: another application holds the Windows audio endpoint. Close that application or disable
+  exclusive control for both cable endpoints in `mmsys.cpl`, apply, and restart the applications.
+- Missing NumPy APIs such as `zeros`: close the old desktop process and rerun `start-pc.ps1` to repair
+  the environment.
+- No phone: verify `adb devices -l` reports `device`, approve USB debugging, or run USB-to-wireless again.
+- UDP cannot connect: ensure both devices are on the same LAN and client isolation is disabled.
+
+Dependency check:
+
+```powershell
+.\.venv\Scripts\python.exe pc\check_environment.py
+```
+
+## Command Line
+
+```powershell
+# List Windows playback endpoints
+.\.venv\Scripts\python.exe pc\bridge.py --list
+
+# List ADB phones
+.\.venv\Scripts\python.exe pc\bridge.py --devices
+
+# Playback only
+.\.venv\Scripts\python.exe pc\bridge.py
+
+# Test the phone microphone
+.\.venv\Scripts\python.exe pc\bridge.py --test-mic --transport wifi
+
+# Full duplex through VB-CABLE
+.\.venv\Scripts\python.exe pc\bridge.py --mic-speaker "CABLE Input"
+
+# Follow Windows microphone usage in low-latency mode
+.\.venv\Scripts\python.exe pc\bridge.py --mic-speaker "CABLE Input" --mode follow --latency low
+```
+
+## Build a Windows Release
+
+`.venv`, Gradle/PyInstaller output, local tests, and `artifacts` are excluded from Git. End users do not
+need Python: use the ZIP attached to the GitHub Release.
+
+```powershell
+.\build-release.ps1 -Version 0.7.1
+```
+
+The ZIP contains `PhoneAudioBridge.exe`, the Android APK, `adb.exe`, its required DLLs, and this bilingual
+README. The application prefers `adb.exe` beside the EXE before searching the system PATH.
+
+Pushing a `v*` tag runs the Windows Release workflow, builds Android and Windows packages, uploads the
+Actions artifact, and attaches the ZIP to the GitHub Release.
