@@ -15,6 +15,12 @@ import android.widget.LinearLayout;
 import android.widget.SeekBar;
 import android.widget.Switch;
 import android.widget.TextView;
+import android.widget.ScrollView;
+import android.widget.Spinner;
+import android.widget.ArrayAdapter;
+import android.widget.AdapterView;
+import android.media.audiofx.AudioEffect;
+import android.provider.Settings;
 
 public final class MainActivity extends Activity {
     private final Handler handler = new Handler(Looper.getMainLooper());
@@ -23,12 +29,14 @@ public final class MainActivity extends Activity {
     private Button stop;
     private final Runnable refresh = new Runnable() {
         @Override public void run() {
-            status.setText(AudioService.status + "\n\n电脑音频  "
+            String updated = AudioService.status + "\n\n电脑音频  "
                     + (AudioService.playbackConnected ? "已连接" : "未连接")
                     + "\n手机麦克风  " + (AudioService.micConnected ? "已连接" : "未连接")
                     + "\n" + AudioService.playbackModeStatus
                     + "\n" + AudioService.qualityStatus
-                    + "\n" + AudioService.aecStatus);
+                    + "\n" + AudioService.aecStatus
+                    + "\n" + PlaybackEffects.currentStatus();
+            if (!updated.contentEquals(status.getText())) status.setText(updated);
             start.setEnabled(!AudioService.running);
             stop.setEnabled(AudioService.running);
             handler.postDelayed(this, 500);
@@ -41,11 +49,14 @@ public final class MainActivity extends Activity {
         layout.setOrientation(LinearLayout.VERTICAL);
         layout.setPadding(dp(24), dp(32), dp(24), dp(24));
         layout.setBackgroundColor(Color.rgb(247, 249, 250));
-        setContentView(layout);
+        ScrollView scroll = new ScrollView(this);
+        scroll.addView(layout);
+        setContentView(scroll);
+        PlaybackEffects.load(this);
         TextView title = label("Phone Audio Bridge", 28);
         title.setTextColor(Color.rgb(20, 100, 88));
         layout.addView(title);
-        layout.addView(label("48 kHz · PCM 16-bit", 14));
+        layout.addView(label("USB / Wi-Fi · PCM 音频桥", 14));
         status = label("已停止", 18);
         status.setPadding(0, dp(32), 0, dp(24));
         layout.addView(status);
@@ -79,6 +90,33 @@ public final class MainActivity extends Activity {
         echo.setChecked(AudioService.echoCancellation);
         echo.setOnCheckedChangeListener((button, checked) -> AudioService.setEchoCancellation(checked));
         layout.addView(echo);
+        layout.addView(label("播放音效（音乐 / 电影等为标准 EQ）", 16));
+        Spinner effects = new Spinner(this);
+        ArrayAdapter<String> adapter = new ArrayAdapter<>(this,
+                android.R.layout.simple_spinner_item, PlaybackEffects.LABELS);
+        adapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
+        effects.setAdapter(adapter);
+        effects.setSelection(PlaybackEffects.profile);
+        effects.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
+            @Override public void onItemSelected(AdapterView<?> parent, View view, int position, long id) {
+                PlaybackEffects.select(MainActivity.this, position);
+            }
+            @Override public void onNothingSelected(AdapterView<?> parent) { }
+        });
+        layout.addView(effects);
+        layout.addView(label(PlaybackEffects.availableVendors(), 13));
+        Button systemEffects = new Button(this);
+        systemEffects.setText("打开系统音效 / Dolby 设置");
+        systemEffects.setOnClickListener(view -> {
+            Intent panel = new Intent(AudioEffect.ACTION_DISPLAY_AUDIO_EFFECT_CONTROL_PANEL)
+                    .putExtra(AudioEffect.EXTRA_AUDIO_SESSION, PlaybackEffects.currentSession())
+                    .putExtra(AudioEffect.EXTRA_PACKAGE_NAME, getPackageName());
+            try { startActivity(panel); }
+            catch (android.content.ActivityNotFoundException | SecurityException error) {
+                startActivity(new Intent(Settings.ACTION_SOUND_SETTINGS));
+            }
+        });
+        layout.addView(systemEffects);
         if (Build.VERSION.SDK_INT >= 35) {
             layout.setOnApplyWindowInsetsListener((view, insets) -> {
                 android.graphics.Insets bars = insets.getInsets(

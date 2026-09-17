@@ -48,6 +48,7 @@ public final class AudioService extends Service {
     public static volatile String playbackModeStatus = "模式待连接";
     public static volatile String qualityStatus = "品质待连接";
     private static final String TAG = "UsbAudio";
+    private final java.util.Map<AudioTrack, PlaybackEffects> playbackEffects = new ConcurrentHashMap<>();
     private static final int RATE = 48000;
     private static final int FRAMES = 480;
     private static final int PLAY_PORT = 27183;
@@ -158,6 +159,7 @@ public final class AudioService extends Service {
 
     @Override public int onStartCommand(Intent intent, int flags, int startId) {
         if (active) return START_NOT_STICKY;
+        PlaybackEffects.load(this);
         NotificationManager notifications = getSystemService(NotificationManager.class);
         notifications.createNotificationChannel(new NotificationChannel(
                 "audio", "Phone Audio Bridge", NotificationManager.IMPORTANCE_LOW));
@@ -380,7 +382,7 @@ public final class AudioService extends Service {
                         || frames != rate / 200 || fragment >= fragmentCount
                         || fragmentCount < 1) continue;
                 if (current == null || current.generation != config.generation) {
-                    if (track != null) track.release();
+                    if (track != null) releasePlayback(track);
                     configurePlaybackMode(config.communication);
                     track = createTrack(frames, rate, bits);
                     track.play();
@@ -429,7 +431,7 @@ public final class AudioService extends Service {
             } catch (SocketTimeoutException ignored) {
                 UdpConfig config = udpConfig;
                 if (current != null && (config == null || current.generation != config.generation)) {
-                    if (track != null) track.release();
+                    if (track != null) releasePlayback(track);
                     track = null;
                     current = null;
                     playbackConnected = false;
@@ -438,7 +440,7 @@ public final class AudioService extends Service {
                 if (active) Log.w(TAG, "UDP 播放异常：" + error.getMessage(), error);
             }
         }
-        if (track != null) track.release();
+        if (track != null) releasePlayback(track);
     }
 
     private AudioTrack createTrack(int frames, int rate, int bits) throws IOException {
@@ -458,23 +460,32 @@ public final class AudioService extends Service {
                         .setEncoding(encoding).build())
                 .setBufferSizeInBytes(Math.max(minimum, frames * 2 * (bits / 8) * 2))
                 .setSessionId(communicationSession)
-                .setPerformanceMode(AudioTrack.PERFORMANCE_MODE_LOW_LATENCY)
+                .setPerformanceMode(communicationMode ? AudioTrack.PERFORMANCE_MODE_LOW_LATENCY
+                        : AudioTrack.PERFORMANCE_MODE_NONE)
                 .setTransferMode(AudioTrack.MODE_STREAM).build();
         if (track.getState() != AudioTrack.STATE_INITIALIZED) {
             track.release();
             throw new IOException("播放器初始化失败");
         }
+        playbackEffects.put(track, new PlaybackEffects(this, track.getAudioSessionId(), communicationMode));
         return track;
     }
 
     private void writeTrack(AudioTrack track, byte[] pcm) throws IOException {
-        track.setVolume(volume);
+        PlaybackEffects effects = playbackEffects.get(track);
+        track.setVolume(volume * (effects == null ? 1f : effects.gain()));
         int offset = 0;
         while (active && offset < pcm.length) {
             int written = track.write(pcm, offset, pcm.length - offset, AudioTrack.WRITE_BLOCKING);
             if (written <= 0) throw new IOException("播放写入失败：" + written);
             offset += written;
         }
+    }
+
+    private void releasePlayback(AudioTrack track) {
+        PlaybackEffects effects = playbackEffects.remove(track);
+        if (effects != null) effects.close();
+        track.release();
     }
 
     private void udpRecordLoop(UdpConfig config) {
@@ -598,11 +609,12 @@ public final class AudioService extends Service {
                         .setEncoding(encoding).build())
                 .setBufferSizeInBytes(Math.max(minimum, frames * 2 * (bits / 8) * 2))
                 .setSessionId(communicationSession)
-                .setPerformanceMode(frames == 240 ? AudioTrack.PERFORMANCE_MODE_LOW_LATENCY
+                .setPerformanceMode(communicationMode && frames == 240 ? AudioTrack.PERFORMANCE_MODE_LOW_LATENCY
                         : AudioTrack.PERFORMANCE_MODE_NONE)
                 .setTransferMode(AudioTrack.MODE_STREAM).build();
         try {
             if (track.getState() != AudioTrack.STATE_INITIALIZED) throw new IOException("播放器初始化失败");
+            playbackEffects.put(track, new PlaybackEffects(this, track.getAudioSessionId(), communicationMode));
             playbackConnected = true;
             status = "USB 音频已连接";
             qualityStatus = (rate / 1000) + " kHz / " + bits + "-bit PCM";
@@ -610,16 +622,10 @@ public final class AudioService extends Service {
             byte[] pcm = new byte[frameBytes];
             while (active) {
                 input.readFully(pcm);
-                track.setVolume(volume);
-                int offset = 0;
-                while (active && offset < pcm.length) {
-                    int written = track.write(pcm, offset, pcm.length - offset, AudioTrack.WRITE_BLOCKING);
-                    if (written <= 0) throw new IOException("播放写入失败：" + written);
-                    offset += written;
-                }
+                writeTrack(track, pcm);
             }
         } finally {
-            track.release();
+            releasePlayback(track);
         }
     }
 

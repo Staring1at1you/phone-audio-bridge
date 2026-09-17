@@ -208,12 +208,15 @@ ANDROID_DEVICE_TYPES = {
 
 def windows_audio_capabilities(selector=None):
     import soundcard as sc
+    from windows_endpoint import get_format, describe_format
     speaker = resolve_speaker(sc, selector)
     channels = int(speaker.channels)
     return {
         "name": speaker.name,
         "channels": channels,
         "layout": channel_layout(channels),
+        "device_format": describe_format(get_format(speaker.id)),
+        "mix_format": describe_format(get_format(speaker.id, mix=True)),
     }
 
 
@@ -384,7 +387,7 @@ class LanUdpSession:
 class Bridge:
     def __init__(self, capture_speaker=None, mic_speaker=None, serial=None, adb="adb", log=print,
                  transport="auto", playback_mode="auto", latency_profile="low",
-                 quality_profile="standard"):
+                 quality_profile="standard", phone_only=False, sync_format=True):
         if playback_mode not in ("auto", "media", "communication", "follow"):
             raise ValueError("Playback mode must be auto, media, communication or follow")
         if latency_profile not in ("low", "stable"):
@@ -400,6 +403,8 @@ class Bridge:
         self.latency_profile = latency_profile
         self.frames = 240 if latency_profile == "low" else 480
         self.quality_profile = quality_profile
+        self.phone_only = phone_only
+        self.sync_format = sync_format
         self.log = log
         self.stop_event = threading.Event()
         self.sockets = []
@@ -464,7 +469,8 @@ class Bridge:
             child_error = []
             child = Bridge(
                 self.capture_speaker, self.mic_speaker, self.serial, self.adb, self.log,
-                self.transport, current_mode, self.latency_profile, self.quality_profile)
+                self.transport, current_mode, self.latency_profile, self.quality_profile,
+                self.phone_only, self.sync_format)
             self.child_bridge = child
 
             def work():
@@ -477,29 +483,53 @@ class Bridge:
             worker.start()
             desired = current_mode
             last_processes = None
-            while worker.is_alive() and not self.stop_event.wait(0.25):
-                processes = active_capture_processes()
-                if processes != last_processes:
-                    self.log("Windows 麦克风使用: "
-                             + (", ".join(processes) if processes else "空闲"))
-                    last_processes = processes
-                if state.update(bool(processes)):
-                    desired = "communication" if state.value else "media"
-                    names = ", ".join(processes) if processes else "无活动程序"
-                    self.log(f"Windows 麦克风: {names}；切换到"
-                             + ("通话模式" if state.value else "影音模式"))
-                    child.stop()
-                    break
-            if self.stop_event.is_set():
+            try:
+                while worker.is_alive() and not self.stop_event.wait(0.25):
+                    processes = active_capture_processes()
+                    if processes != last_processes:
+                        self.log("Windows 麦克风使用: "
+                                 + (", ".join(processes) if processes else "空闲"))
+                        last_processes = processes
+                    if state.update(bool(processes)):
+                        desired = "communication" if state.value else "media"
+                        names = ", ".join(processes) if processes else "无活动程序"
+                        self.log(f"Windows 麦克风: {names}；切换到"
+                                 + ("通话模式" if state.value else "影音模式"))
+                        break
+            finally:
                 child.stop()
-            worker.join()
-            self.child_bridge = None
+                worker.join()
+                self.child_bridge = None
             if child_error and desired == current_mode and not self.stop_event.is_set():
                 raise child_error[0]
             current_mode = desired
         self.log("麦克风会话监控已停止。")
 
     def run_once(self):
+        import soundcard as sc
+        from windows_endpoint import endpoint_settings
+        capture = resolve_speaker(sc, self.capture_speaker)
+        sink = resolve_speaker(sc, self.mic_speaker) if self.mic_speaker else None
+        if sink and capture.id == sink.id:
+            raise ValueError("电脑音频来源与麦克风接收设备应选择不同端点。")
+        self.capture_speaker = capture.id
+        if self.stop_event.is_set():
+            return
+        rate, bits, _ = QUALITY_PROFILES[self.quality_profile]
+        if self.playback_mode == "communication" or (self.playback_mode == "auto" and sink):
+            rate, bits = 48000, 16
+        if not self.sync_format:
+            from windows_endpoint import describe_format, get_format
+            original = describe_format(get_format(capture.id))
+            rate, bits = original['rate'], original['bits']
+        with endpoint_settings(capture.id, rate, bits, self.phone_only, self.log,
+                               change_format=self.sync_format):
+            if self.phone_only:
+                self.log("仅手机播放：电脑所选端点已静音，Loopback 继续采集。")
+            if not self.stop_event.is_set():
+                self._run_audio()
+
+    def _run_audio(self):
         check_audio_dependencies()
         import numpy as np
         import soundcard as sc
@@ -532,6 +562,8 @@ class Bridge:
         self.log(f"Latency: {'5 ms 低延迟' if self.frames == 240 else '10 ms 稳定'}")
         fallback = "（已回退）" if (effective_rate, effective_bits) != (requested_rate, requested_bits) else ""
         self.log(f"Quality: {quality_name} | {effective_rate // 1000} kHz / {effective_bits}-bit {fallback}")
+        if self.sync_format and (effective_rate, effective_bits) != (requested_rate, requested_bits):
+            raise RuntimeError("手机接收格式不支持所选品质，请降低品质后重连。")
         if sink is None:
             self.log("麦克风回传已关闭；需要回传时请选择虚拟音频线的播放端。")
 
@@ -703,6 +735,8 @@ def main():
                         help="Android playback processing mode")
     parser.add_argument("--latency", choices=("low", "stable"), default="low")
     parser.add_argument("--quality", choices=tuple(QUALITY_PROFILES), default="standard")
+    parser.add_argument("--phone-only", action="store_true", help="Mute PC endpoint during streaming")
+    parser.add_argument("--keep-device-format", action="store_true", help="Do not change Windows default format")
     args = parser.parse_args()
     if args.list:
         import soundcard as sc
@@ -712,7 +746,8 @@ def main():
         return
     bridge = Bridge(args.capture_speaker, args.mic_speaker, args.serial, args.adb,
                     transport=args.transport, playback_mode=args.mode,
-                    latency_profile=args.latency, quality_profile=args.quality)
+                    latency_profile=args.latency, quality_profile=args.quality,
+                    phone_only=args.phone_only, sync_format=not args.keep_device_format)
     try:
         if args.connect:
             print(connect_wifi(args.connect, args.adb))

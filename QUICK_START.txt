@@ -1,4 +1,4 @@
-PhoneAudioBridge v0.7.1 - Quick Start / 快速开始
+PhoneAudioBridge v0.8.0 - Quick Start / 快速开始
 ==================================================
 
 中文
@@ -13,6 +13,9 @@ PhoneAudioBridge v0.7.1 - Quick Start / 快速开始
 5. 电脑运行 PhoneAudioBridge.exe。
 6. 选择手机设备和“电脑音频来源”，点击“连接”。
 7. 播放电脑声音，声音会从手机扬声器或手机耳机输出。
+   品质同步会修改 Windows“高级/默认格式”，停止后恢复；驱动拒绝时选择较低品质。
+   勾选“仅手机播放”可临时静音电脑所选端点，停止后恢复。
+   手机音效选择“系统音效 / Dolby 兼容”可配合系统 Dolby；其他预设为标准 EQ。
 
 无线模式：
 - 手机和电脑连接同一局域网。
@@ -38,6 +41,9 @@ English
 5. Run PhoneAudioBridge.exe on Windows.
 6. Select the phone and PC audio source, then click Connect.
 7. Play audio on Windows; it should come from the phone speaker or phone-connected headset.
+   Format sync changes the Windows default format and restores it when stopped.
+   Phone-only playback temporarily mutes the selected PC endpoint and restores it on stop.
+   System effects / Dolby compatibility uses OEM effects; other presets use standard EQ.
 
 Wireless mode:
 - Connect the phone and PC to the same LAN.

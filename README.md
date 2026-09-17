@@ -4,6 +4,23 @@
 
 ## 中文
 
+### 0.8.0：系统格式、手机独播与音效
+
+- 勾选“同步修改电脑扬声器默认格式”后，连接时会修改所选端点在 Windows
+  “声音 → 播放 → 属性 → 高级 → 默认格式”中的采样率和位深；停止、正常退出或连接报错后恢复原值。
+  标准 48/16、中品质 96/24、无损品质 192/24。驱动拒绝目标值时会报错；可降低品质，或取消同步以允许重采样。
+- “支持的格式”页的 Dolby Digital/DTS 与采样率列表是外接 S/PDIF 解码器能力声明，程序不自动修改这些声明。
+  Windows 默认设备格式和 WASAPI 混音格式分别显示；24-bit PCM 设备对应 32-bit float 混音是正常情况。
+- 勾选“仅手机播放”，连接期间会临时静音所选电脑播放端点，停止后恢复。当前 Realtek 端点实测静音仍可捕获
+  Loopback。不同驱动可能表现不同；若手机也无声，取消此项，使用单独的虚拟播放端点采集。
+  任务管理器强制结束进程或断电不执行清理，可在系统声音设置手动恢复原格式和静音。
+- Android 新增“系统音效 / Dolby 兼容、音乐、电影、语音清晰、夜间、关闭应用音效”。
+  系统模式保留媒体音频属性，并通知系统音效管理器播放会话；显示 Dolby/DAP/MiSound/DTS 的可用实现。
+  检测到实现不代表该效果已启用。用“打开系统音效 / Dolby 设置”在手机系统中控制真实 Dolby。
+- 音乐、电影、语音、夜间为标准 Android EQ 预设，夜间额外降低播放增益；它们不是 Dolby 解码器。
+  “关闭应用音效”只释放本应用 EQ，系统 Dolby 仍由系统设置控制。通话模式暂停应用 EQ，保留 AEC/NS。
+  媒体音效优先模式可能比强制低延迟轨道增加一些播放延迟。
+
 PhoneAudioBridge 是 Windows 电脑没有音响、耳机或可用外放设备时的应急音频方案。
 只要手边有一台 Android 手机，就可以把它临时作为电脑扬声器，并可将手机麦克风回传给 Windows。
 
@@ -246,6 +263,23 @@ Android APK 和 Windows ZIP、上传 Actions artifact，并将 ZIP 附加到 Git
 ---
 
 ## English
+
+### 0.8.0: Windows Format, Phone-only Playback and Effects
+
+- **Sync Windows default format** changes the selected endpoint's Advanced / Default Format before connecting,
+  reads it back, and restores it on stop, normal exit or errors. Profiles request 48/16, 96/24 or 192/24.
+  Unsupported formats fail visibly; choose a lower profile or disable synchronization to allow resampling.
+  This changes the default PCM format, not the S/PDIF receiver capability declarations on the Supported Formats tab.
+- **Phone-only playback** temporarily mutes the selected Windows endpoint and restores its original mute state.
+  Loopback capture remained active on the tested Realtek endpoint. If your driver also silences capture,
+  disable this option and use a separate virtual playback endpoint. Forced termination or power loss bypasses
+  cleanup; restore the format/mute manually in Windows sound settings in that case.
+- Android now offers **System effects / Dolby compatibility, Music, Movie, Voice, Night and App effects off**.
+  Available Dolby/DAP/MiSound/DTS implementations are detected, but availability is not proof of activation.
+  Use the system effects button to configure the vendor's Dolby implementation.
+- App presets use public Android Equalizer APIs; Night also reduces playback gain. These are not Dolby
+  decoders. App effects off does not disable global OEM effects. Communication mode suspends app EQ while
+  retaining AEC/NS. Media-effect compatibility may add latency compared with a forced low-latency track.
 
 PhoneAudioBridge is an emergency audio solution for a Windows PC without speakers, headphones, or
 another usable physical output device. An available Android phone can temporarily act as the PC speaker,

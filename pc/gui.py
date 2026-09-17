@@ -23,9 +23,10 @@ class App:
         self.phones = []
         self.network_busy = False
         self.closing = False
+        self.user_stopped = False
         root.title("PhoneAudioBridge")
-        root.geometry("720x610")
-        root.minsize(600, 550)
+        root.geometry("780x800")
+        root.minsize(700, 720)
         root.protocol("WM_DELETE_WINDOW", self.close)
         content = ttk.Frame(root, padding=24)
         content.pack(fill="both", expand=True)
@@ -79,6 +80,14 @@ class App:
         ])
         self.quality.current(0)
         self.quality.grid(row=0, column=1, sticky="ew")
+        self.sync_format = tk.BooleanVar(value=True)
+        self.phone_only = tk.BooleanVar(value=False)
+        self.sync_check = ttk.Checkbutton(quality_row,
+            text="同步修改电脑扬声器默认格式（停止后恢复）", variable=self.sync_format)
+        self.sync_check.grid(row=1, column=0, columnspan=2, sticky="w", pady=(8, 0))
+        self.phone_check = ttk.Checkbutton(quality_row,
+            text="仅手机播放（临时静音所选电脑扬声器 / 耳机）", variable=self.phone_only)
+        self.phone_check.grid(row=2, column=0, columnspan=2, sticky="w", pady=(6, 0))
         buttons = ttk.Frame(content)
         buttons.grid(row=11, sticky="w", pady=(0, 16))
         self.start_button = ttk.Button(buttons, text="连接", command=self.start)
@@ -171,6 +180,8 @@ class App:
                 actual = min(2, available)
                 self.events.put(("log",
                     f"Windows: {windows['name']} | {windows['layout']} ({windows['channels']} 声道)\n"
+                    f"Windows 默认格式: {windows['device_format']['rate']} Hz / {windows['device_format']['bits']}-bit\n"
+                    f"WASAPI 混音: {windows['mix_format']['rate']} Hz / {windows['mix_format']['bits']}-bit\n"
                     f"Android: {android['device']} | 当前 {android['layout']} | 最大 {android['max_layout']}\n"
                     f"Android PCM: 当前 {android['rate'] // 1000} kHz / {android['bits']}-bit | "
                     f"最大 {android['max_rate'] // 1000} kHz / {android['max_bits']}-bit\n"
@@ -188,6 +199,7 @@ class App:
             return
         if self.thread and self.thread.is_alive():
             return
+        self.user_stopped = False
         if not test_mic and self.capture.current() < 0:
             messagebox.showerror("音频设备", "请选择电脑音频来源。")
             return
@@ -203,7 +215,8 @@ class App:
         self.bridge = Bridge(capture, sink, serial=selected.serial if selected else None,
                              log=lambda text: self.events.put(("log", text)),
                              playback_mode=playback_mode, latency_profile=latency_profile,
-                             quality_profile=quality_profile)
+                             quality_profile=quality_profile, phone_only=self.phone_only.get(),
+                             sync_format=self.sync_format.get())
         self.start_button["state"] = "disabled"
         self.stop_button["state"] = "normal"
         self.refresh_button["state"] = "disabled"
@@ -213,6 +226,8 @@ class App:
         self.mode["state"] = "disabled"
         self.latency["state"] = "disabled"
         self.quality["state"] = "disabled"
+        self.sync_check["state"] = "disabled"
+        self.phone_check["state"] = "disabled"
         self.wifi_button["state"] = "disabled"
         self.mic_button["state"] = "disabled"
         self.capability_button["state"] = "disabled"
@@ -225,7 +240,7 @@ class App:
                 else:
                     self.bridge.run()
             except Exception as error:
-                if not self.bridge.stop_event.is_set():
+                if not self.user_stopped:
                     self.events.put(("log", f"Error: {error}"))
             finally:
                 self.events.put(("done", "已停止"))
@@ -234,6 +249,7 @@ class App:
         self.thread.start()
 
     def stop(self):
+        self.user_stopped = True
         if self.bridge:
             self.bridge.stop()
         self.stop_button["state"] = "disabled"
@@ -277,6 +293,8 @@ class App:
                 self.mode["state"] = "readonly"
                 self.latency["state"] = "readonly"
                 self.quality["state"] = "readonly"
+                self.sync_check["state"] = "normal"
+                self.phone_check["state"] = "normal"
                 self.wifi_button["state"] = "normal"
                 self.mic_button["state"] = "normal"
                 self.capability_button["state"] = "normal"
