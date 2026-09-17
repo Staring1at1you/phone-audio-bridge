@@ -51,6 +51,7 @@ foreach ($taskFile in $taskAdbFiles) {
 }
 Copy-Item -LiteralPath $taskApk -Destination (Join-Path $taskPackage 'PhoneAudioBridge-Android.apk')
 Copy-Item -LiteralPath 'README.md' -Destination $taskPackage
+Copy-Item -LiteralPath 'QUICK_START.txt' -Destination $taskPackage
 
 $taskZip = Join-Path $taskArtifactRoot "$taskPackageName.zip"
 Compress-Archive -LiteralPath $taskPackage -DestinationPath $taskZip -CompressionLevel Optimal

@@ -1,0 +1,46 @@
+PhoneAudioBridge v0.7.1 - Quick Start / 快速开始
+==================================================
+
+中文
+----
+1. 解压整个 ZIP，不要只单独运行 EXE。
+2. 在 Android 手机上安装 PhoneAudioBridge-Android.apk。
+3. 手机打开“开发者选项”和“USB 调试”，用数据线连接电脑并确认授权。
+4. 手机打开 Phone Audio Bridge，允许麦克风权限，点击“启动音频”。
+5. 电脑运行 PhoneAudioBridge.exe。
+6. 选择手机设备和“电脑音频来源”，点击“连接”。
+7. 播放电脑声音，声音会从手机扬声器或手机耳机输出。
+
+无线模式：
+- 手机和电脑连接同一局域网。
+- 首次保持 USB 连接，在电脑端点击“USB 转无线”。
+- 无线设备出现后可以拔掉 USB 数据线。
+
+手机麦克风回传：
+- 安装 VB-CABLE：https://vb-audio.com/Cable/
+- PhoneAudioBridge 的“手机麦克风接收设备”选择 CABLE Input。
+- QQ、OBS 或会议软件的麦克风选择 CABLE Output。
+
+当前仅支持 Windows -> Android，暂不支持 iPhone / iOS。
+
+English
+-------
+1. Extract the entire ZIP. Do not run the EXE by itself outside the package.
+2. Install PhoneAudioBridge-Android.apk on the Android phone.
+3. Enable Developer options and USB debugging, connect USB, and approve the computer.
+4. Open Phone Audio Bridge on the phone, grant microphone permission, and tap Start Audio.
+5. Run PhoneAudioBridge.exe on Windows.
+6. Select the phone and PC audio source, then click Connect.
+7. Play audio on Windows; it should come from the phone speaker or phone-connected headset.
+
+Wireless mode:
+- Connect the phone and PC to the same LAN.
+- Keep USB attached for first setup and click USB to Wireless.
+- Unplug USB after the wireless device appears.
+
+Phone microphone return:
+- Install VB-CABLE: https://vb-audio.com/Cable/
+- Select CABLE Input as the microphone destination in PhoneAudioBridge.
+- Select CABLE Output as the microphone in QQ, OBS, or conference software.
+
+Windows to Android is supported. iPhone and iOS are not supported.
