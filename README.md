@@ -4,7 +4,12 @@
 
 ## 中文
 
-用 USB 数据线或局域网 Wi-Fi 把 Android 手机作为电脑的音频终端：
+PhoneAudioBridge 是 Windows 电脑没有音响、耳机或可用外放设备时的应急音频方案。
+只要手边有一台 Android 手机，就可以把它临时作为电脑扬声器，并可将手机麦克风回传给 Windows。
+
+> 当前仅支持 Windows → Android，暂不支持 iPhone / iOS。
+
+通过 USB 数据线或局域网 Wi-Fi 将 Android 手机作为电脑的音频终端：
 
 - 电脑系统播放音频送到手机扬声器或手机连接的耳机。
 - 手机麦克风回传电脑，经虚拟音频线提供给 QQ、会议、录音或直播软件。
@@ -223,6 +228,12 @@ Android APK 和 Windows ZIP、上传 Actions artifact，并将 ZIP 附加到 Git
 ---
 
 ## English
+
+PhoneAudioBridge is an emergency audio solution for a Windows PC without speakers, headphones, or
+another usable physical output device. An available Android phone can temporarily act as the PC speaker,
+with optional phone-microphone return to Windows.
+
+> Currently supports Windows to Android only. iPhone and iOS are not supported.
 
 PhoneAudioBridge turns an Android phone into a Windows audio endpoint:
 
